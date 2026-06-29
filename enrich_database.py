@@ -18,7 +18,8 @@ def main():
     for index, row in df.head(50).iterrows():
         sku = str(row['Artikelnummer'])
         print(f"Verwerken: {row['Naam']}")
-        # Hier zou je de zoeklogica weer toevoegen...
+        # Aangepast naar jouw tabelnaam: spellendata
+        # endpoint = f"{SUPABASE_URL}/rest/v1/spellendata?sku=eq.{sku}"
         time.sleep(1.0)
 
 if __name__ == "__main__":
