@@ -1,164 +1,47 @@
-# =====================================================================
-# SPELENSHOP AUTOMATISCHE SETUP VOOR POWERSHELL
-# Kopieer dit volledige bestand en plak het in je PowerShell venster!
-# =====================================================================
-
-# 1. Zorg dat de map C:\spelvoordeel bestaat en ga er naartoe
-$targetFolder = "C:\spelvoordeel"
-if (-not (Test-Path -Path $targetFolder)) {
-    New-Item -ItemType Directory -Force -Path $targetFolder | Out-Null
-    Write-Host "[INFO] Map $targetFolder succesvol aangemaakt!" -ForegroundColor Green
-} else {
-    Write-Host "[INFO] Map $targetFolder bestaat al. We gaan hierin aan de slag." -ForegroundColor Yellow
-}
-Set-Location -Path $targetFolder
-
-# 2. Maak de index.html aan (verbeterde versie voor betere stabiliteit)
-$htmlContent = @'
 <!DOCTYPE html>
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpellenShop - De Leukste Aanbiedingen!</title>
+    <title>SpellenShop - Instellingen</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-amber-50/40 min-h-screen">
-    <div class="max-w-7xl mx-auto px-4 py-12 text-center" id="appRoot">
-        <h1 class="text-4xl font-bold text-slate-800 mb-6">SpellenShop</h1>
-        <div id="statusMessage" class="p-6 bg-white rounded-2xl shadow-sm border border-slate-200 inline-block">
-            <i class="fa-solid fa-spinner animate-spin text-amber-500 text-3xl mb-4"></i>
-            <p class="text-slate-600">Verbinden met database...</p>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+    <div id="app" class="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-slate-100 text-center">
+        <h1 class="text-2xl font-bold mb-6 text-slate-800">SpellenShop Setup</h1>
+        <div id="content">
+            <p class="mb-6 text-slate-600">Voer hieronder je Supabase gegevens in om de shop te koppelen:</p>
+            <input id="inUrl" placeholder="Supabase Project URL" class="block w-full border border-slate-300 p-3 mb-3 rounded-lg">
+            <input id="inKey" placeholder="Supabase Anon Key" class="block w-full border border-slate-300 p-3 mb-6 rounded-lg">
+            <button onclick="save()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-lg transition">Koppelen & Laden</button>
         </div>
-        <div id="productsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 text-left"></div>
     </div>
 
     <script>
-        const { createClient } = supabase;
-        let supabaseClient = null;
+        function save() {
+            localStorage.setItem('supabase_url', document.getElementById('inUrl').value);
+            localStorage.setItem('supabase_key', document.getElementById('inKey').value);
+            location.reload();
+        }
 
         async function init() {
             const url = localStorage.getItem('supabase_url');
             const key = localStorage.getItem('supabase_key');
-            const statusMsg = document.getElementById('statusMessage');
-
-            if (!url || !key) {
-                statusMsg.innerHTML = '<p class="text-red-500">Geen database configuratie gevonden. Open de console (F12) voor instellingen.</p>';
-                return;
-            }
-
-            try {
-                supabaseClient = createClient(url, key);
-                const { data, error } = await supabaseClient.from('products').select('*');
-                
-                if (error) throw error;
-
-                statusMsg.style.display = 'none';
-                renderGrid(data);
-            } catch (err) {
-                console.error(err);
-                statusMsg.innerHTML = `<p class="text-red-500">Fout bij laden: ${err.message}</p>`;
+            if (url && key) {
+                document.getElementById('content').innerHTML = '<p class="text-green-600 font-bold">Verbinden...</p>';
+                try {
+                    const client = supabase.createClient(url, key);
+                    const { data, error } = await client.from('products').select('*');
+                    if (error) throw error;
+                    document.getElementById('app').innerHTML = '<h1 class="text-3xl font-bold">Shop geladen!</h1><p class="mt-4">Kijk in de console voor de data.</p>';
+                    console.log("Producten uit database:", data);
+                } catch(e) {
+                    document.getElementById('content').innerHTML = '<p class="text-red-500">Fout: ' + e.message + '</p><button onclick="localStorage.clear();location.reload()" class="mt-4 text-blue-500">Opnieuw proberen</button>';
+                }
             }
         }
-
-        function renderGrid(products) {
-            const grid = document.getElementById('productsGrid');
-            grid.innerHTML = products.map(p => `
-                <div class="bg-white p-4 rounded-xl shadow-sm border">
-                    <img src="${p.image_url || 'https://via.placeholder.com/200'}" class="w-full h-40 object-contain mb-4">
-                    <h3 class="font-bold">${p.Naam || p.name}</h3>
-                    <p class="text-amber-600 font-bold">€${p.Adviesprijs || p.retail_price}</p>
-                </div>
-            `).join('');
-        }
-
         init();
     </script>
 </body>
 </html>
-'@
-$htmlContent | Out-File -FilePath "$targetFolder\index.html" -Encoding utf8 -Force
-Write-Host "[INFO] Website bestand (index.html) gecreëerd!" -ForegroundColor Green
-
-# 3. Maak de enrich_database.py aan (de database verrijker)
-$pyContent = @'
-import os
-import time
-import re
-import pandas as pd
-import requests
-
-# =====================================================================
-# INSTELLINGEN: VUL HIER JOUW EIGEN SUPABASE GEGEVENS IN
-# =====================================================================
-SUPABASE_URL = "JOUW_SUPABASE_URL_HIER"      
-SUPABASE_KEY = "JOUW_SUPABASE_ANON_KEY_HIER"  
-
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-    "Prefer": "resolution=merge-duplicates"
-}
-
-def vind_productfeed_bestand():
-    mogelijke_bestanden = ["Productfeed.xlsx - Sheet.csv", "Productfeed.xlsx", "Productfeed.csv"]
-    for bestand in mogelijke_bestanden:
-        if os.path.exists(bestand):
-            return bestand
-    return None
-
-def zoek_afbeelding_op_barcode(ean_str):
-    try:
-        url = f"https://api.upcitemdb.com/prod/trial/lookup?upc={ean_str}"
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('items') and len(data['items']) > 0:
-                images = data['items'][0].get('images', [])
-                if images: return images[0]
-    except Exception: pass
-    return None
-
-def main():
-    print("=== SPELlENSHOP - DATABASE VERRIJKER ===")
-    
-    feed_bestand = vind_productfeed_bestand()
-    if not feed_bestand:
-        print("[FOUT] Geen productfeed gevonden.")
-        return
-        
-    df = pd.read_csv(feed_bestand) if feed_bestand.endswith('.csv') else pd.read_excel(feed_bestand)
-    
-    succesvol = 0
-    for index, row in df.iterrows():
-        sku = str(row['Artikelnummer'])
-        ean = str(row['EAN']).split('.')[0].strip() if not pd.isna(row['EAN']) else ""
-        
-        if not ean or len(ean) < 10: continue
-            
-        afbeelding_url = zoek_afbeelding_op_barcode(ean)
-        
-        if afbeelding_url:
-            endpoint = f"{SUPABASE_URL}/rest/v1/products?sku=eq.{sku}"
-            res = requests.patch(endpoint, json={"image_url": afbeelding_url}, headers=HEADERS)
-            if res.status_code in [200, 201, 204]:
-                succesvol += 1
-        time.sleep(2.0)
-
-    print(f"Klaar! {succesvol} afbeeldingen toegevoegd.")
-
-if __name__ == "__main__":
-    main()
-'@
-$pyContent | Out-File -FilePath "$targetFolder\enrich_database.py" -Encoding utf8 -Force
-Write-Host "[INFO] Python script (enrich_database.py) gecreëerd!" -ForegroundColor Green
-
-# 4. Installeer de vereiste python bibliotheken
-Write-Host "[INFO] Bezig met installeren van vereiste Python modules..." -ForegroundColor Cyan
-pip install pandas openpyxl requests
-
-Write-Host "=====================================================================" -ForegroundColor Green
-Write-Host "Setup voltooid!" -ForegroundColor Green
