@@ -32,11 +32,17 @@
                 document.getElementById('content').innerHTML = '<p class="text-green-600 font-bold">Verbinden...</p>';
                 try {
                     const client = supabase.createClient(url, key);
-                    // Aangepast naar jouw tabelnaam: spellendata
+                    // We zoeken expliciet in de tabel: spellendata
                     const { data, error } = await client.from('spellendata').select('*');
+                    
                     if (error) throw error;
-                    document.getElementById('app').innerHTML = '<h1 class="text-3xl font-bold">Shop geladen!</h1><p class="mt-4">Kijk in de console voor de data.</p>';
-                    console.log("Data uit tabel spellendata:", data);
+                    
+                    if (!data || data.length === 0) {
+                        document.getElementById('app').innerHTML = '<h1 class="text-2xl font-bold text-slate-800">Shop verbonden!</h1><p class="mt-4 text-slate-600">De tabel <strong>spellendata</strong> is momenteel leeg. Voeg producten toe via je database of het Python-script.</p>';
+                    } else {
+                        document.getElementById('app').innerHTML = '<h1 class="text-3xl font-bold">Shop geladen!</h1><p class="mt-4">Er zijn ' + data.length + ' spellen gevonden. Kijk in de console voor de data.</p>';
+                        console.log("Data uit tabel spellendata:", data);
+                    }
                 } catch(e) {
                     document.getElementById('content').innerHTML = '<p class="text-red-500">Fout: ' + e.message + '</p><button onclick="localStorage.clear();location.reload()" class="mt-4 text-blue-500">Opnieuw proberen</button>';
                 }
