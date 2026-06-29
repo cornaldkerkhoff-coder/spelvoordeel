@@ -1,3 +1,20 @@
+# =====================================================================
+# SPELENSHOP AUTOMATISCHE SETUP VOOR POWERSHELL
+# Kopieer dit volledige bestand en plak het in je PowerShell venster!
+# =====================================================================
+
+# 1. Zorg dat de map C:\spelvoordeel bestaat en ga er naartoe
+$targetFolder = "C:\spelvoordeel"
+if (-not (Test-Path -Path $targetFolder)) {
+    New-Item -ItemType Directory -Force -Path $targetFolder | Out-Null
+    Write-Host "[INFO] Map $targetFolder succesvol aangemaakt!" -ForegroundColor Green
+} else {
+    Write-Host "[INFO] Map $targetFolder bestaat al. We gaan hierin aan de slag." -ForegroundColor Yellow
+}
+Set-Location -Path $targetFolder
+
+# 2. Maak de index.html aan (verbeterde versie voor betere stabiliteit)
+$htmlContent = @'
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -7,270 +24,141 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Outfit:wght@300;400;600;800&display=swap');
-        body { font-family: 'Outfit', sans-serif; }
-        .heading-font { font-family: 'Comfortaa', cursive; }
-        .animate-spin-slow { animation: spin 8s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    </style>
 </head>
-<body class="bg-amber-50/40 min-h-screen flex flex-col">
-    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full"></div>
-    <header class="bg-white shadow-sm sticky top-0 z-40 border-b border-amber-100">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <a href="#" class="flex items-center gap-2">
-                <div class="bg-amber-500 text-white p-2 rounded-xl shadow-md shadow-amber-500/20">
-                    <i class="fa-solid fa-dice-d20 text-2xl animate-spin-slow"></i>
-                </div>
-                <span class="heading-font text-2xl font-bold text-slate-800">Spellen<span class="text-amber-500">Shop</span></span>
-            </a>
-            <div class="hidden md:flex items-center flex-1 max-w-md mx-8">
-                <div class="relative w-full">
-                    <input type="text" id="searchInput" placeholder="Zoek een bordspel of kaartspel..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 pl-10 pr-4 py-2 rounded-full focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all">
-                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-3 text-slate-400"></i>
-                </div>
-            </div>
-            <div class="flex items-center gap-4">
-                <button onclick="toggleSettingsModal()" class="p-2.5 rounded-full hover:bg-slate-100 text-slate-600 relative transition-colors">
-                    <i class="fa-solid fa-database text-lg"></i>
-                    <span id="dbStatusDot" class="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-                </button>
-                <button onclick="toggleCart()" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-full flex items-center gap-2 shadow-md shadow-amber-500/10 transition-all active:scale-95 relative">
-                    <i class="fa-solid fa-shopping-basket text-lg"></i>
-                    <span class="font-semibold hidden sm:inline">Winkelwagen</span>
-                    <span id="cartCount" class="bg-white text-amber-600 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center shadow-sm">0</span>
-                </button>
-            </div>
+<body class="bg-amber-50/40 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 py-12 text-center" id="appRoot">
+        <h1 class="text-4xl font-bold text-slate-800 mb-6">SpellenShop</h1>
+        <div id="statusMessage" class="p-6 bg-white rounded-2xl shadow-sm border border-slate-200 inline-block">
+            <i class="fa-solid fa-spinner animate-spin text-amber-500 text-3xl mb-4"></i>
+            <p class="text-slate-600">Verbinden met database...</p>
         </div>
-    </header>
-    <section class="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white py-12 px-4 text-center relative overflow-hidden">
-        <h1 class="heading-font text-3xl sm:text-5xl font-bold mb-3">De Leukste Spellen voor de Beste Prijs!</h1>
-        <p class="text-white/90 text-lg max-w-xl mx-auto font-light">Direct gekoppeld aan je eigen database met de echte spelfoto's!</p>
-    </section>
-    <main class="max-w-7xl mx-auto px-4 py-8 flex-grow w-full grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <aside class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 self-start">
-            <h3 class="font-bold text-lg text-slate-800 mb-4"><i class="fa-solid fa-sliders text-amber-500"></i> Filters</h3>
-            <div class="mb-6">
-                <label class="block text-sm font-semibold text-slate-600 mb-2">Categorie</label>
-                <select id="categoryFilter" class="w-full bg-slate-50 border border-slate-200 text-slate-700 py-2.5 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500">
-                    <option value="all">Alle Categorieën</option>
-                    <option value="Kaartspel">Kaartspellen</option>
-                    <option value="Bordspel">Bordspellen</option>
-                    <option value="Dobbelspel">Dobbelspellen</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-slate-600 mb-2">Sorteren op</label>
-                <select id="sortFilter" class="w-full bg-slate-50 border border-slate-200 text-slate-700 py-2.5 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500">
-                    <option value="popular">Kortingsknallers</option>
-                    <option value="price-asc">Prijs: Laag naar Hoog</option>
-                    <option value="price-desc">Prijs: Hoog naar Laag</option>
-                </select>
-            </div>
-        </aside>
-        <section class="lg:col-span-3">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-slate-800" id="productsTitle">Producten aanbod</h2>
-                <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full" id="productsCount">0 spellen</span>
-            </div>
-            <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="col-span-full text-center py-20 text-slate-400">
-                    <i class="fa-solid fa-spinner animate-spin text-4xl mb-4 text-amber-500"></i>
-                    <p>Wacht op database verbinding...</p>
-                </div>
-            </div>
-        </section>
-    </main>
-    <div id="settingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative">
-            <button onclick="toggleSettingsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            <h3 class="heading-font text-xl font-bold text-slate-800 mb-2">Supabase Koppeling</h3>
-            <p class="text-sm text-slate-500 mb-4">Plak hier jouw Supabase URL en Anon Key om verbinding te maken met je eigen producten!</p>
-            <div class="space-y-4">
-                <input type="text" id="supabaseUrlInput" placeholder="https://xxxxxx.supabase.co" class="w-full bg-slate-50 border p-3 rounded-xl focus:outline-none">
-                <input type="password" id="supabaseKeyInput" placeholder="Anon Key" class="w-full bg-slate-50 border p-3 rounded-xl focus:outline-none">
-                <button onclick="saveDbSettings()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl">Opslaan & Verbinden</button>
-            </div>
-        </div>
+        <div id="productsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 text-left"></div>
     </div>
-    <div id="cartSidebar" class="fixed inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 border-l border-slate-100 flex flex-col hidden">
-        <div class="p-6 border-b flex justify-between items-center bg-slate-50">
-            <h3 class="heading-font text-lg font-bold text-slate-800">Jouw Bestelling</h3>
-            <button onclick="toggleCart()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
-        </div>
-        <div id="cartItems" class="p-6 space-y-4 overflow-y-auto flex-grow">
-            <p class="text-center text-slate-400 py-12">Je winkelwagen is leeg.</p>
-        </div>
-        <div class="p-6 border-t bg-slate-50 space-y-4">
-            <div class="flex justify-between items-center font-bold text-lg">
-                <span>Totaal:</span> <span id="cartTotal">€0,00</span>
-            </div>
-            <button onclick="showToast('Bestelling verzonden!', 'Dit gaan we later koppelen!', 'success')" class="w-full bg-emerald-500 text-white py-3 rounded-xl font-bold">Afrekenen</button>
-        </div>
-    </div>
+
     <script>
-        let activeProducts = [];
-        let cart = [];
+        const { createClient } = supabase;
         let supabaseClient = null;
 
-        window.addEventListener('DOMContentLoaded', () => {
-            loadSavedDatabaseCredentials();
-            setupFilters();
-        });
+        async function init() {
+            const url = localStorage.getItem('supabase_url');
+            const key = localStorage.getItem('supabase_key');
+            const statusMsg = document.getElementById('statusMessage');
 
-        function showToast(title, message, type = 'info') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            const bgClass = type === 'success' ? 'bg-emerald-50' : 'bg-amber-50';
-            toast.className = `p-4 rounded-xl border ${bgClass} shadow-lg transition-all duration-300`;
-            toast.innerHTML = `<h4 class="font-bold text-sm">${title}</h4><p class="text-xs">${message}</p>`;
-            container.appendChild(toast);
-            setTimeout(() => { toast.remove(); }, 3000);
-        }
+            if (!url || !key) {
+                statusMsg.innerHTML = '<p class="text-red-500">Geen database configuratie gevonden. Open de console (F12) voor instellingen.</p>';
+                return;
+            }
 
-        function setupFilters() {
-            const searchInput = document.getElementById('searchInput');
-            const categoryFilter = document.getElementById('categoryFilter');
-            const sortFilter = document.getElementById('sortFilter');
-
-            const apply = () => {
-                const searchVal = searchInput.value.toLowerCase();
-                const catVal = categoryFilter.value;
-                const sortVal = sortFilter.value;
-                let filtered = [...activeProducts];
-
-                if (searchVal) filtered = filtered.filter(p => p.name.toLowerCase().includes(searchVal));
-                if (catVal !== 'all') filtered = filtered.filter(p => p.category.includes(catVal));
+            try {
+                supabaseClient = createClient(url, key);
+                const { data, error } = await supabaseClient.from('products').select('*');
                 
-                if (sortVal === 'price-asc') filtered.sort((a,b) => getPrice(a) - getPrice(b));
-                else if (sortVal === 'price-desc') filtered.sort((a,b) => getPrice(b) - getPrice(a));
+                if (error) throw error;
 
-                renderGrid(filtered);
-            };
-
-            searchInput.addEventListener('input', apply);
-            categoryFilter.addEventListener('change', apply);
-            sortFilter.addEventListener('change', apply);
-        }
-
-        function getPrice(p) {
-            return Math.min(p.cost_price * 1.35, p.retail_price - 1);
+                statusMsg.style.display = 'none';
+                renderGrid(data);
+            } catch (err) {
+                console.error(err);
+                statusMsg.innerHTML = `<p class="text-red-500">Fout bij laden: ${err.message}</p>`;
+            }
         }
 
         function renderGrid(products) {
             const grid = document.getElementById('productsGrid');
-            document.getElementById('productsCount').textContent = `${products.length} spellen`;
-            if (products.length === 0) {
-                grid.innerHTML = `<p class="col-span-full text-center py-10">Geen spellen gevonden.</p>`;
-                return;
-            }
-            grid.innerHTML = products.map(p => {
-                const price = getPrice(p);
-                const discount = Math.round(((p.retail_price - price)/p.retail_price)*100);
-                const image = p.image_url || 'https://via.placeholder.com/300?text=Geen+Afbeelding';
-                return `
-                    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm flex flex-col justify-between p-4 relative">
-                        <span class="absolute top-2 left-2 bg-rose-500 text-white text-xs font-bold px-2 py-1 rounded-full">-${discount}%</span>
-                        <div class="h-48 w-full flex items-center justify-center">
-                            <img src="${image}" alt="${p.name}" class="h-full object-contain">
-                        </div>
-                        <div class="mt-4">
-                            <h3 class="font-bold text-slate-800 line-clamp-1">${p.name}</h3>
-                            <p class="text-xs text-slate-400">${p.brand}</p>
-                            <div class="flex justify-between items-center mt-3">
-                                <div>
-                                    <span class="text-xs line-through text-slate-400">€${p.retail_price.toFixed(2)}</span>
-                                    <span class="text-lg font-bold text-rose-500 block">€${price.toFixed(2)}</span>
-                                </div>
-                                <button onclick="addToCart('${p.sku}')" class="bg-amber-500 text-white h-10 w-10 rounded-full flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            grid.innerHTML = products.map(p => `
+                <div class="bg-white p-4 rounded-xl shadow-sm border">
+                    <img src="${p.image_url || 'https://via.placeholder.com/200'}" class="w-full h-40 object-contain mb-4">
+                    <h3 class="font-bold">${p.Naam || p.name}</h3>
+                    <p class="text-amber-600 font-bold">€${p.Adviesprijs || p.retail_price}</p>
+                </div>
+            `).join('');
         }
 
-        function toggleCart() {
-            document.getElementById('cartSidebar').classList.toggle('hidden');
-            document.getElementById('cartSidebar').classList.toggle('translate-x-full');
-        }
-
-        function toggleSettingsModal() {
-            document.getElementById('settingsModal').classList.toggle('hidden');
-        }
-
-        function loadSavedDatabaseCredentials() {
-            const url = localStorage.getItem('supabase_url');
-            const key = localStorage.getItem('supabase_key');
-            if (url && key) {
-                document.getElementById('supabaseUrlInput').value = url;
-                document.getElementById('supabaseKeyInput').value = key;
-                connectToSupabase(url, key);
-            }
-        }
-
-        function saveDbSettings() {
-            const url = document.getElementById('supabaseUrlInput').value.trim();
-            const key = document.getElementById('supabaseKeyInput').value.trim();
-            if (url && key) {
-                localStorage.setItem('supabase_url', url);
-                localStorage.setItem('supabase_key', key);
-                toggleSettingsModal();
-                connectToSupabase(url, key);
-            }
-        }
-
-        async function connectToSupabase(url, key) {
-            try {
-                supabaseClient = supabase.createClient(url, key);
-                const { data, error } = await supabaseClient.from('products').select('*').limit(100);
-                if (error) throw error;
-                if (data) {
-                    activeProducts = data.map(item => ({
-                        sku: item.Artikelnummer || item.sku,
-                        name: item.Naam || item.name,
-                        cost_price: parseFloat(String(item.Lijstprijs || item.cost_price).replace(',', '.')),
-                        retail_price: parseFloat(String(item.Adviesprijs || item.retail_price).replace(',', '.')),
-                        category: item.Categorie || item.category || 'Spellen',
-                        brand: item.Merk || item.brand || '999 Games',
-                        image_url: item.image_url
-                    }));
-                    document.getElementById('dbStatusDot').className = "absolute top-2 right-2 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white";
-                    renderGrid(activeProducts);
-                    showToast('Verbonden!', 'Je live producten zijn succesvol geladen!', 'success');
-                }
-            } catch (err) {
-                showToast('Verbindingsfout', 'Kan geen verbinding maken met Supabase.', 'error');
-            }
-        }
-
-        function addToCart(sku) {
-            const product = activeProducts.find(p => p.sku === sku);
-            if (!product) return;
-            const existing = cart.find(i => i.product.sku === sku);
-            if (existing) existing.quantity++;
-            else cart.push({ product, quantity: 1 });
-            updateCart();
-        }
-
-        function updateCart() {
-            const count = cart.reduce((sum, i) => sum + i.quantity, 0);
-            document.getElementById('cartCount').textContent = count;
-            const items = document.getElementById('cartItems');
-            if (cart.length === 0) {
-                items.innerHTML = '<p class="text-center text-slate-400 py-12">Winkelwagen is leeg.</p>';
-                document.getElementById('cartTotal').textContent = '€0,00';
-                return;
-            }
-            let total = 0;
-            items.innerHTML = cart.map(i => {
-                const price = getPrice(i.product);
-                total += price * i.quantity;
-                return `<div class="flex justify-between items-center py-2 border-b"><div><h4 class="font-bold text-sm">${i.product.name}</h4><span class="text-xs text-rose-500">€${price.toFixed(2)} x ${i.quantity}</span></div></div>`;
-            }).join('');
-            document.getElementById('cartTotal').textContent = `€${total.toFixed(2)}`;
-        }
+        init();
     </script>
 </body>
 </html>
+'@
+$htmlContent | Out-File -FilePath "$targetFolder\index.html" -Encoding utf8 -Force
+Write-Host "[INFO] Website bestand (index.html) gecreëerd!" -ForegroundColor Green
+
+# 3. Maak de enrich_database.py aan (de database verrijker)
+$pyContent = @'
+import os
+import time
+import re
+import pandas as pd
+import requests
+
+# =====================================================================
+# INSTELLINGEN: VUL HIER JOUW EIGEN SUPABASE GEGEVENS IN
+# =====================================================================
+SUPABASE_URL = "JOUW_SUPABASE_URL_HIER"      
+SUPABASE_KEY = "JOUW_SUPABASE_ANON_KEY_HIER"  
+
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "resolution=merge-duplicates"
+}
+
+def vind_productfeed_bestand():
+    mogelijke_bestanden = ["Productfeed.xlsx - Sheet.csv", "Productfeed.xlsx", "Productfeed.csv"]
+    for bestand in mogelijke_bestanden:
+        if os.path.exists(bestand):
+            return bestand
+    return None
+
+def zoek_afbeelding_op_barcode(ean_str):
+    try:
+        url = f"https://api.upcitemdb.com/prod/trial/lookup?upc={ean_str}"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('items') and len(data['items']) > 0:
+                images = data['items'][0].get('images', [])
+                if images: return images[0]
+    except Exception: pass
+    return None
+
+def main():
+    print("=== SPELlENSHOP - DATABASE VERRIJKER ===")
+    
+    feed_bestand = vind_productfeed_bestand()
+    if not feed_bestand:
+        print("[FOUT] Geen productfeed gevonden.")
+        return
+        
+    df = pd.read_csv(feed_bestand) if feed_bestand.endswith('.csv') else pd.read_excel(feed_bestand)
+    
+    succesvol = 0
+    for index, row in df.iterrows():
+        sku = str(row['Artikelnummer'])
+        ean = str(row['EAN']).split('.')[0].strip() if not pd.isna(row['EAN']) else ""
+        
+        if not ean or len(ean) < 10: continue
+            
+        afbeelding_url = zoek_afbeelding_op_barcode(ean)
+        
+        if afbeelding_url:
+            endpoint = f"{SUPABASE_URL}/rest/v1/products?sku=eq.{sku}"
+            res = requests.patch(endpoint, json={"image_url": afbeelding_url}, headers=HEADERS)
+            if res.status_code in [200, 201, 204]:
+                succesvol += 1
+        time.sleep(2.0)
+
+    print(f"Klaar! {succesvol} afbeeldingen toegevoegd.")
+
+if __name__ == "__main__":
+    main()
+'@
+$pyContent | Out-File -FilePath "$targetFolder\enrich_database.py" -Encoding utf8 -Force
+Write-Host "[INFO] Python script (enrich_database.py) gecreëerd!" -ForegroundColor Green
+
+# 4. Installeer de vereiste python bibliotheken
+Write-Host "[INFO] Bezig met installeren van vereiste Python modules..." -ForegroundColor Cyan
+pip install pandas openpyxl requests
+
+Write-Host "=====================================================================" -ForegroundColor Green
+Write-Host "Setup voltooid!" -ForegroundColor Green
