@@ -2,50 +2,29 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpellenShop - Instellingen</title>
+    <title>SpellenShop</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
-    <div id="app" class="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-slate-100 text-center">
-        <h1 class="text-2xl font-bold mb-6 text-slate-800">SpellenShop Setup</h1>
-        <div id="content">
-            <p class="mb-6 text-slate-600">Voer hieronder je Supabase gegevens in om de shop te koppelen:</p>
-            <input id="inUrl" placeholder="Supabase Project URL" class="block w-full border border-slate-300 p-3 mb-3 rounded-lg">
-            <input id="inKey" placeholder="Supabase Anon Key" class="block w-full border border-slate-300 p-3 mb-6 rounded-lg">
-            <button onclick="save()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-lg transition">Koppelen & Laden</button>
-        </div>
+<body class="bg-slate-50 p-8">
+    <div id="app" class="max-w-4xl mx-auto text-center">
+        <h1 class="text-3xl font-bold mb-4">SpellenShop</h1>
+        <div id="content"><p>Verbinden met database...</p></div>
     </div>
-
     <script>
-        function save() {
-            localStorage.setItem('supabase_url', document.getElementById('inUrl').value);
-            localStorage.setItem('supabase_key', document.getElementById('inKey').value);
-            location.reload();
-        }
-
+        const { createClient } = supabase;
         async function init() {
-            const url = localStorage.getItem('supabase_url');
-            const key = localStorage.getItem('supabase_key');
-            if (url && key) {
-                document.getElementById('content').innerHTML = '<p class="text-green-600 font-bold">Verbinden...</p>';
-                try {
-                    const client = supabase.createClient(url, key);
-                    // We zoeken expliciet in de tabel: spellendata
-                    const { data, error } = await client.from('spellendata').select('*');
-                    
-                    if (error) throw error;
-                    
-                    if (!data || data.length === 0) {
-                        document.getElementById('app').innerHTML = '<h1 class="text-2xl font-bold text-slate-800">Shop verbonden!</h1><p class="mt-4 text-slate-600">De tabel <strong>spellendata</strong> is momenteel leeg. Voeg producten toe via je database of het Python-script.</p>';
-                    } else {
-                        document.getElementById('app').innerHTML = '<h1 class="text-3xl font-bold">Shop geladen!</h1><p class="mt-4">Er zijn ' + data.length + ' spellen gevonden. Kijk in de console voor de data.</p>';
-                        console.log("Data uit tabel spellendata:", data);
-                    }
-                } catch(e) {
-                    document.getElementById('content').innerHTML = '<p class="text-red-500">Fout: ' + e.message + '</p><button onclick="localStorage.clear();location.reload()" class="mt-4 text-blue-500">Opnieuw proberen</button>';
-                }
+            // Vul hier je eigen Supabase gegevens in
+            const url = 'JE_SUPABASE_URL_HIER';
+            const key = 'JE_SUPABASE_ANON_KEY_HIER';
+            const client = createClient(url, key);
+            
+            // Controleer je tabel: staat deze in 'spellendata'?
+            const { data, error } = await client.from('spellendata').select('*');
+            if (error) {
+                document.getElementById('content').innerHTML = "Fout: " + error.message;
+            } else {
+                document.getElementById('content').innerHTML = "Aantal spellen gevonden: " + data.length;
             }
         }
         init();
