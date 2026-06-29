@@ -32,10 +32,11 @@
                 document.getElementById('content').innerHTML = '<p class="text-green-600 font-bold">Verbinden...</p>';
                 try {
                     const client = supabase.createClient(url, key);
-                    const { data, error } = await client.from('products').select('*');
+                    // Aangepast naar jouw tabelnaam: spellendata
+                    const { data, error } = await client.from('spellendata').select('*');
                     if (error) throw error;
                     document.getElementById('app').innerHTML = '<h1 class="text-3xl font-bold">Shop geladen!</h1><p class="mt-4">Kijk in de console voor de data.</p>';
-                    console.log("Producten uit database:", data);
+                    console.log("Data uit tabel spellendata:", data);
                 } catch(e) {
                     document.getElementById('content').innerHTML = '<p class="text-red-500">Fout: ' + e.message + '</p><button onclick="localStorage.clear();location.reload()" class="mt-4 text-blue-500">Opnieuw proberen</button>';
                 }
