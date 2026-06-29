@@ -10,65 +10,81 @@
 <body class="bg-slate-50 text-slate-900">
 
     <!-- Header -->
-    <header class="bg-white border-b border-slate-200 p-6 sticky top-0 z-10">
+    <header class="bg-white border-b border-slate-200 p-6 sticky top-0 z-10 shadow-sm">
         <h1 class="text-3xl font-extrabold text-center text-slate-800">SpellenShop</h1>
     </header>
 
     <!-- Hoofdinhoud -->
     <main class="max-w-6xl mx-auto p-6">
-        <div id="loading" class="text-center py-20 text-slate-500">
-            Spellen ophalen uit de database...
+        
+        <!-- Configuratie Paneel (alleen zichtbaar als er nog geen sleutels zijn) -->
+        <div id="setup-panel" class="hidden bg-white p-8 rounded-2xl shadow-lg border border-slate-200 mb-10 max-w-md mx-auto">
+            <h2 class="text-xl font-bold mb-4 text-slate-800">Koppel je Database</h2>
+            <p class="text-sm text-slate-500 mb-6">Voer eenmalig je gegevens in. Deze worden veilig in je browser bewaard.</p>
+            <input id="inUrl" placeholder="Supabase Project URL" class="block w-full border border-slate-300 p-3 mb-3 rounded-lg">
+            <input id="inKey" placeholder="Supabase Anon Key" class="block w-full border border-slate-300 p-3 mb-6 rounded-lg">
+            <button onclick="opslaan()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">Koppelen & Laden</button>
         </div>
-        <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            <!-- Producten komen hier -->
+
+        <!-- Laadindicator -->
+        <div id="loading" class="text-center py-20 text-slate-500">
+            Even geduld... We laden je spellen uit de database.
+        </div>
+
+        <!-- Producten Grid -->
+        <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+            <!-- Producten verschijnen hier automatisch -->
         </div>
     </main>
 
     <script>
-        // Vul hier je eigen Supabase gegevens in
-        const SUPABASE_URL = 'https://maqddhglptutujgfidvh.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_0nvRdxjniryd50xgSsGcBg_oP29z61-';
-        
         async function laadProducten() {
+            const url = localStorage.getItem('supabase_url');
+            const key = localStorage.getItem('supabase_key');
             const productGrid = document.getElementById('product-grid');
             const loading = document.getElementById('loading');
-            
-            // Controleer of de URL correct is ingesteld
-            if (SUPABASE_URL.includes('jouw-project-id') || !SUPABASE_URL.startsWith('http')) {
-                loading.innerHTML = '<p class="text-red-500 font-bold">Configuratie-fout: Controleer je Supabase URL in de code.</p>';
+
+            if (!url || !key) {
+                document.getElementById('setup-panel').classList.remove('hidden');
+                loading.style.display = 'none';
                 return;
             }
 
-            const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            const supabaseClient = supabase.createClient(url, key);
             
             const { data, error } = await supabaseClient
-                .from('products') 
+                .from('spellendata') 
                 .select('*');
 
             loading.style.display = 'none';
 
             if (error) {
-                productGrid.innerHTML = `<p class="col-span-full text-red-500 text-center">Fout bij laden: ${error.message}</p>`;
+                productGrid.innerHTML = `<p class="col-span-full text-red-500 text-center font-bold">Fout bij laden: ${error.message}</p>`;
                 return;
             }
 
-            if (data.length === 0) {
-                productGrid.innerHTML = `<p class="col-span-full text-center text-slate-500">Nog geen spellen gevonden.</p>`;
+            if (!data || data.length === 0) {
+                productGrid.innerHTML = `<p class="col-span-full text-center text-slate-500">Nog geen spellen gevonden in je database.</p>`;
                 return;
             }
 
-            // Producten op het scherm tekenen
             productGrid.innerHTML = data.map(product => `
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition">
-                    <div class="h-48 bg-slate-100 flex items-center justify-center">
-                        ${product.image_url ? `<img src="${product.image_url}" alt="${product.naam}" class="h-full w-full object-cover">` : '<span class="text-slate-400">Geen afbeelding</span>'}
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300">
+                    <div class="h-56 bg-slate-100 flex items-center justify-center">
+                        ${product.image_url ? `<img src="${product.image_url}" alt="${product.naam}" class="h-full w-full object-cover">` : '<span class="text-slate-400 font-medium">Geen afbeelding</span>'}
                     </div>
-                    <div class="p-4">
-                        <h2 class="font-bold text-lg mb-1 truncate">${product.naam}</h2>
-                        <p class="text-sm text-slate-500">Artikelnummer: ${product.sku}</p>
+                    <div class="p-5">
+                        <h2 class="font-bold text-lg mb-1 text-slate-800 truncate">${product.naam || 'Naamloos spel'}</h2>
+                        <p class="text-sm text-slate-400 font-medium tracking-wide">ART: ${product.sku || 'N/A'}</p>
                     </div>
                 </div>
             `).join('');
+        }
+
+        function opslaan() {
+            localStorage.setItem('supabase_url', document.getElementById('inUrl').value);
+            localStorage.setItem('supabase_key', document.getElementById('inKey').value);
+            location.reload();
         }
 
         laadProducten();
